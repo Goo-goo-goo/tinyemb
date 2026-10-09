@@ -104,17 +104,25 @@ def _batcher_loop(worker_id: int):
 def _startup():
     global model
     t0 = time.perf_counter()
-    # 模型目录缺失时自动从 ModelScope 下载(model_id 可用 TINYEMB_MODEL_ID 覆盖)
-    ensure_model(MODEL_DIR, os.environ.get("TINYEMB_MODEL_ID"))
-    model = TinyEmb(MODEL_DIR)
-    model.set_threads(N_THREADS)
+    try:
+        print(f"[tinyemb] 模型目录: {os.path.abspath(MODEL_DIR)}")
+        # 模型目录缺失时自动从 ModelScope 下载(model_id 可用 TINYEMB_MODEL_ID 覆盖)
+        ensure_model(MODEL_DIR, os.environ.get("TINYEMB_MODEL_ID"))
+        print(f"[tinyemb] 加载模型...")
+        model = TinyEmb(MODEL_DIR)
+        model.set_threads(N_THREADS)
 
-    # 预热:跑几批,预热 ggml 内核/缓存/页表,消除冷启动
-    warmup_texts = ["预热句子", "warmup", "北京的天气不错", "人工智能"]
-    for _ in range(3):
-        model.encode_batch(warmup_texts[:MAX_BATCH])
-    print(f"[tinyemb] 模型加载+预热 {time.perf_counter()-t0:.2f}s | "
-          f"batch={MAX_BATCH} wait={MAX_WAIT_MS}ms workers={N_WORKERS} threads={N_THREADS}")
+        # 预热:跑几批,预热 ggml 内核/缓存/页表,消除冷启动
+        warmup_texts = ["预热句子", "warmup", "北京的天气不错", "人工智能"]
+        for _ in range(3):
+            model.encode_batch(warmup_texts[:MAX_BATCH])
+        print(f"[tinyemb] 模型加载+预热 {time.perf_counter()-t0:.2f}s | "
+              f"batch={MAX_BATCH} wait={MAX_WAIT_MS}ms workers={N_WORKERS} threads={N_THREADS}")
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        print("[tinyemb] 启动失败!详细错误见上方 traceback", file=sys.stderr, flush=True)
+        raise
 
     # 启动批处理 worker 线程
     for i in range(N_WORKERS):
