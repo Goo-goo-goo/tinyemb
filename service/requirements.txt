@@ -1,0 +1,5 @@
+# tinyemb 服务运行时依赖(轻量)
+fastapi>=0.110
+uvicorn>=0.29
+orjson>=3.9
+modelscope>=1.14

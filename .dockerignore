@@ -1,0 +1,13 @@
+# 构建上下文排除项:减小 docker build 传输量,避免污染镜像
+.git
+.venv
+__pycache__
+*.pyc
+build
+build-release
+.cache
+# 注意:不能排除 test/ 和 src/,CMake configure 需要它们存在
+# 模型不打进镜像(183MB),运行时挂载或自动下载
+models
+*.md
+scripts

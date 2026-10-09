@@ -1,0 +1,53 @@
+# ============================================================
+# tinyembed .gitignore
+# 忽略构建产物、依赖、缓存、模型,只保留源码和配置
+# ============================================================
+
+# ---- 构建产物 ----
+build/
+build-release/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+
+# ---- 第三方 ggml 的构建目录 ----
+third_party/ggml/build/
+
+# ---- 模型(体积大,自动下载/挂载,不进版本库)----
+models/
+*.safetensors
+*.bin
+*.gguf
+*.onnx
+*.pt
+*.pth
+
+# ---- Python ----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---- 缓存/临时 ----
+.cache/
+.ms_cache/
+*.incomplete
+*.tmp
+*.log
+
+# ---- IDE / 系统 ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# ---- 测试/基准产物 ----
+ref_vec*.txt

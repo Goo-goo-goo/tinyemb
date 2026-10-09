@@ -1,0 +1,40 @@
+# tinyemb 一键部署(NAS 友好)
+# 用法:
+#   docker compose up -d              # 启动(首次自动下载模型)
+#   docker compose logs -f            # 看日志(含下载进度)
+#   curl http://127.0.0.1:8000/health
+#
+# 持久化模型:取消下面 volumes 注释,模型下载到宿主机,重建容器不重复下载。
+
+services:
+  tinyemb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tinyemb:latest
+    container_name: tinyemb
+    ports:
+      - "8000:8000"
+    # 资源限制(低功耗 NAS 友好;Q8_0 模式约 150MB 内存)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "2.0"
+    restart: unless-stopped
+    environment:
+      - TINYEMB_QUANT=1          # Q8_0 量化(降内存)
+      - TINYEMB_THREADS=2        # 每次推理线程数
+      - TINYEMB_WORKERS=2        # 并发批处理线程数
+      - TINYEMB_BATCH=8          # 单批条数
+      # - TINYEMB_MODEL_ID=BAAI/bge-small-zh-v1.5   # 可换模型
+    # volumes:
+    #   - ./models:/app/models   # 持久化模型(推荐,避免重建重复下载)
+
+    # 首次启动要下载模型(约 50 秒),给足健康检查启动期
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
