@@ -10,15 +10,17 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ---- 可移植的 CPU 优化 ----
-# 不用 -march=native(在编译机上最优但换 CPU 可能非法指令崩溃)。
-# 用 x86-64-v2 基线(SSE4.2/SSSE3,2009+ 的 CPU 都支持,含 J3160/Braswell)。
-# 想要更强可在部署机上加 -DCMAKE_C_FLAGS="-march=native"。
+# 关键:目标是老 x86 CPU(如 Intel J3160/Braswell),只支持到 SSE4.2,
+# 不支持 AVX/AVX2/AVX-512。所以编译目标必须是 -msse4.2,绝不能用:
+#   -march=native  → 换机器 Illegal instruction
+#   -march=x86-64-v2 → 含 AVX,J3160 不支持,仍会 Illegal instruction
+# 若确定部署机是新 CPU(支持 AVX2+),可加 -DCMAKE_C_FLAGS="-march=native" 提速。
 include(CheckCCompilerFlag)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
-  check_c_compiler_flag("-march=x86-64-v2" HAS_X86V2)
-  if(HAS_X86V2)
-    add_compile_options($<$<COMPILE_LANGUAGE:C>:-march=x86-64-v2>)
-    message(STATUS "CPU 目标:x86-64-v2(通用 x86 基线)")
+  check_c_compiler_flag("-msse4.2" HAS_SSE42)
+  if(HAS_SSE42)
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:-msse4.2>)
+    message(STATUS "CPU 目标:SSE4.2(兼容 J3160/Braswell 等老 x86)")
   endif()
 endif()
 
@@ -34,9 +36,19 @@ set(GGML_BLAS  OFF CACHE BOOL "" FORCE)
 set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
 set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
 set(GGML_SDL   OFF CACHE BOOL "" FORCE)
-# GGML_NATIVE 必须 OFF!否则按编译机 CPU 生成指令,换机器(NAS/不同 CPU)会 Illegal instruction。
-# OFF = 运行时按实际 CPU 分发内核,通用 x86 都能跑。
+# GGML_NATIVE 必须 OFF!否则按编译机 CPU 写死指令,换机器(NAS/不同 CPU)会 Illegal instruction。
+# OFF = 运行时检测 CPU,按实际能力分发内核。
 set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+# 显式编译多套指令集内核(SSE4.2/AVX/AVX2/BMI2),运行时按 CPU 选最优:
+#   J3160/Braswell 等老 CPU → 自动用 SSE4.2 内核
+#   Xeon 5218 / 新 CPU     → 自动用 AVX2 内核(更快)
+# 这样一份二进制兼容多种 x86,且各 CPU 用各自最优指令。
+set(GGML_SSE42 ON CACHE BOOL "" FORCE)
+set(GGML_AVX   ON CACHE BOOL "" FORCE)
+set(GGML_AVX2  ON CACHE BOOL "" FORCE)
+set(GGML_BMI2  ON CACHE BOOL "" FORCE)
+set(GGML_FMA   ON CACHE BOOL "" FORCE)
+set(GGML_F16C  ON CACHE BOOL "" FORCE)
 
 add_subdirectory(third_party/ggml)
 
