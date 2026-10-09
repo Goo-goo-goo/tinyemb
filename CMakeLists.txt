@@ -39,16 +39,17 @@ set(GGML_SDL   OFF CACHE BOOL "" FORCE)
 # GGML_NATIVE 必须 OFF!否则按编译机 CPU 写死指令,换机器(NAS/不同 CPU)会 Illegal instruction。
 # OFF = 运行时检测 CPU,按实际能力分发内核。
 set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
-# 显式编译多套指令集内核(SSE4.2/AVX/AVX2/BMI2),运行时按 CPU 选最优:
-#   J3160/Braswell 等老 CPU → 自动用 SSE4.2 内核
-#   Xeon 5218 / 新 CPU     → 自动用 AVX2 内核(更快)
-# 这样一份二进制兼容多种 x86,且各 CPU 用各自最优指令。
+# 指令集:只用 SSE4.2(J3160/Braswell 等老 x86 的安全基线)。
+# 严禁开 AVX/AVX2/BMI2/FMA/F16C!这些会让编译器把 AVX 指令编进
+# 整个库(连 ggml_graph_plan 这类函数都被自动向量化),在不支持 AVX 的
+# CPU(如 J3160)上直接 Illegal instruction(实测崩在 ggml_graph_plan)。
+# 若确定部署机支持 AVX2+,可放开这些提速;但通用兼容必须全关。
 set(GGML_SSE42 ON CACHE BOOL "" FORCE)
-set(GGML_AVX   ON CACHE BOOL "" FORCE)
-set(GGML_AVX2  ON CACHE BOOL "" FORCE)
-set(GGML_BMI2  ON CACHE BOOL "" FORCE)
-set(GGML_FMA   ON CACHE BOOL "" FORCE)
-set(GGML_F16C  ON CACHE BOOL "" FORCE)
+set(GGML_AVX   OFF CACHE BOOL "" FORCE)
+set(GGML_AVX2  OFF CACHE BOOL "" FORCE)
+set(GGML_BMI2  OFF CACHE BOOL "" FORCE)
+set(GGML_FMA   OFF CACHE BOOL "" FORCE)
+set(GGML_F16C  OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(third_party/ggml)
 
