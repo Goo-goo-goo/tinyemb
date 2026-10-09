@@ -33,7 +33,7 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
 # ============================================================
 # 运行阶段:不含编译工具,只有 Python + 依赖 + 产物
 # ============================================================
-FROM --platform=linux/amd64 python:3.11-slim AS runtime
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.11-slim AS runtime
 
 # ---- 换 pip 源为清华(快,且或json等都有预编译 wheel)----
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple \
@@ -45,12 +45,15 @@ RUN pip install --no-cache-dir -r /app/service/requirements.txt
 
 WORKDIR /app
 COPY service/ service/
+# 拷贝推理引擎 + 它依赖的 ggml 动态库(libggml / libggml-cpu / libggml-base)
 COPY --from=build /src/build/libtinyemb.so* /app/build/
+COPY --from=build /src/build/third_party/ggml/src/libggml*.so* /app/build/
 # 模型不打进镜像(减小体积)。启动时自动从 ModelScope 下载到 /app/models。
 RUN mkdir -p /app/models
 
 # 环境变量:纯 CPU + Q8_0 量化(内存小)+ 自动下载 model_id
 ENV PYTHONUNBUFFERED=1 \
+    LD_LIBRARY_PATH=/app/build \
     TINYEMB_LIB=/app/build/libtinyemb.so \
     TINYEMB_MODEL=/app/models/bge-small-zh-v1.5 \
     TINYEMB_MODEL_ID=BAAI/bge-small-zh-v1.5 \
