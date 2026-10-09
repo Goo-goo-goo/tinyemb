@@ -34,8 +34,9 @@ set(GGML_BLAS  OFF CACHE BOOL "" FORCE)
 set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
 set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
 set(GGML_SDL   OFF CACHE BOOL "" FORCE)
-# 允许 ggml 在运行时按 CPU 分发内核(x86 上按 SSE/AVX2/AVX512 分发,但缺指令集会回退)
-set(GGML_NATIVE ON CACHE BOOL "" FORCE)
+# GGML_NATIVE 必须 OFF!否则按编译机 CPU 生成指令,换机器(NAS/不同 CPU)会 Illegal instruction。
+# OFF = 运行时按实际 CPU 分发内核,通用 x86 都能跑。
+set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(third_party/ggml)
 
