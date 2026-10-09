@@ -36,15 +36,21 @@ set(GGML_BLAS  OFF CACHE BOOL "" FORCE)
 set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
 set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
 set(GGML_SDL   OFF CACHE BOOL "" FORCE)
-# GGML_NATIVE 必须 OFF!否则按编译机 CPU 写死指令,换机器(NAS/不同 CPU)会 Illegal instruction。
-# OFF = 运行时检测 CPU,按实际能力分发内核。
-set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
-# 指令集:只用 SSE4.2(J3160/Braswell 等老 x86 的安全基线)。
-# 严禁开 AVX/AVX2/BMI2/FMA/F16C!这些会让编译器把 AVX 指令编进
-# 整个库(连 ggml_graph_plan 这类函数都被自动向量化),在不支持 AVX 的
-# CPU(如 J3160)上直接 Illegal instruction(实测崩在 ggml_graph_plan)。
-# 若确定部署机支持 AVX2+,可放开这些提速;但通用兼容必须全关。
-set(GGML_SSE42 ON CACHE BOOL "" FORCE)
+# 指令集:用 ggml 官方的多变体编译(GGML_CPU_ALL_VARIANTS)。
+# 这是"多指令集兼容 + 各用最优"的正确机制:
+#   为每个 CPU 微架构编译独立变体(x64 兜底 / sse42 / haswell AVX2 / skylakex AVX512 ...)。
+#   运行时按 CPU 自动选最优变体:
+#     J3160/Braswell(仅SSE4.2) → 用 sse42 变体,不崩
+#     Xeon 5218(AVX2)          → 用 haswell 变体,更快
+#     更新 CPU(AVX512)         → 用 skylakex+ 变体,最快
+#   x64 变体兜底,任何 x86 都能跑。
+# 注意:GGML_CPU_ALL_VARIANTS 要求 GGML_BACKEND_DL(变体运行时动态加载)。
+# 严禁单独开 GGML_AVX2 等(不隔离到变体,会把 AVX 编进公共代码,老 CPU 崩)。
+set(GGML_BACKEND_DL        ON  CACHE BOOL "" FORCE)
+set(GGML_CPU_ALL_VARIANTS  ON  CACHE BOOL "" FORCE)
+set(GGML_NATIVE            OFF CACHE BOOL "" FORCE)
+# 关闭单独的指令集开关(交给多变体机制统一管理)
+set(GGML_SSE42 OFF CACHE BOOL "" FORCE)
 set(GGML_AVX   OFF CACHE BOOL "" FORCE)
 set(GGML_AVX2  OFF CACHE BOOL "" FORCE)
 set(GGML_BMI2  OFF CACHE BOOL "" FORCE)
