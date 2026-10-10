@@ -82,7 +82,8 @@ add_library(tinyemb SHARED
   src/bert_model.c
   src/bert_layer.c
   src/tokenizer.c
-  src/safetensor_loader.c)
+  src/safetensor_loader.c
+  src/ggml_backend_global.c)
 target_include_directories(tinyemb PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(tinyemb PRIVATE ggml::ggml)
 set_target_properties(tinyemb PROPERTIES
@@ -96,21 +97,21 @@ tinyemb_add_test(step1 test/test_safetensor_loader.c src/safetensor_loader.c)
 
 tinyemb_add_test(test_tokenizer test/test_tokenizer.c src/tokenizer.c)
 
-tinyemb_add_test(test_ggml_ops test/test_ggml_ops.c src/ggml_ops.c)
+tinyemb_add_test(test_ggml_ops test/test_ggml_ops.c src/ggml_ops.c src/ggml_backend_global.c)
 target_link_libraries(test_ggml_ops PRIVATE ggml::ggml)
 
-tinyemb_add_test(test_bert_layer test/test_bert_layer.c src/bert_layer.c)
+tinyemb_add_test(test_bert_layer test/test_bert_layer.c src/bert_layer.c src/ggml_backend_global.c)
 target_link_libraries(test_bert_layer PRIVATE ggml::ggml)
 
 tinyemb_add_test(test_bert_model
   test/test_bert_model.c
-  src/bert_model.c src/bert_layer.c src/tokenizer.c src/safetensor_loader.c)
+  src/bert_model.c src/bert_layer.c src/tokenizer.c src/safetensor_loader.c src/ggml_backend_global.c)
 target_link_libraries(test_bert_model PRIVATE ggml::ggml)
 
 # ---- 性能基准(无 ASan,Release 语义)----
 add_executable(bench
   test/bench.c
-  src/tinyemb.c src/bert_model.c src/bert_layer.c src/tokenizer.c src/safetensor_loader.c)
+  src/tinyemb.c src/bert_model.c src/bert_layer.c src/tokenizer.c src/safetensor_loader.c src/ggml_backend_global.c)
 target_include_directories(bench PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(bench PRIVATE ggml::ggml)
 set_target_properties(bench PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)

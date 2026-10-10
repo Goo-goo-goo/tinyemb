@@ -7,6 +7,7 @@
 
 #include "ggml.h"
 #include "ggml-cpu.h"
+#include "io/ggml_backend_global.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -83,7 +84,8 @@ int self_attention(const float* q, const float* k, const float* v,
 
     struct ggml_cgraph* gf = ggml_new_graph(ctx);
     ggml_build_forward_expand(gf, o3);
-    ggml_graph_compute_with_ctx(ctx, gf, nt);
+    ggml_backend_global_set_threads(nt);
+    ggml_backend_global_compute(gf);
 
     memcpy(out, o3->data, seq * dim * sizeof(float));
     ggml_free(ctx);
@@ -206,7 +208,8 @@ int bert_layer(const BertLayerW* w,
 
     struct ggml_cgraph* gf = ggml_new_graph(ctx);
     ggml_build_forward_expand(gf, l2);
-    ggml_graph_compute_with_ctx(ctx, gf, nt);
+    ggml_backend_global_set_threads(nt);
+    ggml_backend_global_compute(gf);
 
     memcpy(y, l2->data, n_elem * sizeof(float));
     ggml_free(ctx);

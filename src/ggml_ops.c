@@ -4,6 +4,7 @@
 
 #include "ggml.h"
 #include "ggml-cpu.h"
+#include "io/ggml_backend_global.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -55,7 +56,8 @@ int layernorm(const float* x, const float* gamma, const float* beta,
     ggml_build_forward_expand(gf, out);
 
     // ---- 第五步:计算 ----
-    ggml_graph_compute_with_ctx(ctx, gf, /*n_threads=*/1);
+    ggml_backend_global_set_threads(1);
+    ggml_backend_global_compute(gf);
 
     // ---- 第六步:取结果 ----
     memcpy(y, out->data, dim * sizeof(float));
@@ -95,7 +97,8 @@ int matmul(const float* W, const float* x, float* z, int out_dim, int in_dim) {
     struct ggml_tensor* out = ggml_mul_mat(ctx, tW, tx);   // → [out_dim, 1]
     struct ggml_cgraph* gf = ggml_new_graph(ctx);
     ggml_build_forward_expand(gf, out);
-    ggml_graph_compute_with_ctx(ctx, gf, 1);
+    ggml_backend_global_set_threads(1);
+    ggml_backend_global_compute(gf);
 
     memcpy(z, out->data, out_dim * sizeof(float));
 
