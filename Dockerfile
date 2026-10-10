@@ -51,9 +51,16 @@ RUN pip install --no-cache-dir -r /app/service/requirements.txt
 
 WORKDIR /app
 COPY service/ service/
-# 拷贝推理引擎 + 它依赖的 ggml 动态库(libggml / libggml-cpu / libggml-base)
+# 拷贝推理引擎 + ggml 主库 + CPU 变体插件
+# 关键:全变体模式下 CPU 后端是动态插件(libggml-cpu-sse42.so 等,在 build/bin/),
+# 必须和 libtinyemb.so 放同一目录(或工作目录),ggml load_all 才能找到并加载。
+# 少了这些插件 → ggml_backend_init_by_type(CPU) 失败 → 推理全 0。
 COPY --from=build /src/build/libtinyemb.so* /app/build/
 COPY --from=build /src/build/third_party/ggml/src/libggml*.so* /app/build/
+# CPU 变体插件要放工作目录 /app(不是 /app/build)!因为 libtinyemb 是被 Python
+# ctypes 加载的,ggml load_all 找的是"可执行文件(Python)目录 + 当前工作目录"。
+# 放 /app(=WORKDIR)最可靠,load_all 找 current_path() 就能 dlopen 到。
+COPY --from=build /src/build/bin/libggml-cpu-*.so* /app/
 # 模型不打进镜像(减小体积)。启动时自动从 ModelScope 下载到 /app/models。
 RUN mkdir -p /app/models
 
