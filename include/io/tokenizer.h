@@ -26,9 +26,17 @@ int wp_tokenize(const WordPiece* wp,
 
 // 便捷封装:直接输出 id 序列(自动加 [CLS]/[SEP])。
 // ids 容量 max_out。返回 0 成功,-1 出错。
+//
+// truncate 决定超长(正文 token 数 > max_out-2)时的行为,语义对齐 HF truncation=True:
+//   truncate != 0(默认):截断正文到 max_out-2 个,补 [SEP],总长恰好 = max_out。
+//                       恒返回 0,[SEP] 永不丢失。
+//   truncate == 0     :不截断,若正文放不下就返回 -1(ids/n_ids 未定义)。
+//                       max_out < 2 时恒返回 -1。
+// 未知 token 一律映射成 [UNK](id=100),不会写入 -1 之类的非法 id。
 int wp_encode(const WordPiece* wp,
               const char* text,
-              int* ids, size_t* n_ids, size_t max_out);
+              int* ids, size_t* n_ids, size_t max_out,
+              int truncate);
 
 // 释放 wp_tokenize 产生的一批字符串
 void wp_free_tokens(char** tokens, size_t n);

@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
     if (wp_load(&wp, "models/bge-small-zh-v1.5/vocab.txt") != 0) return 1;
     int ids[512];
     size_t n_ids = 0;
-    wp_encode(&wp, text, ids, &n_ids, 512);
+    wp_encode(&wp, text, ids, &n_ids, 512, 1);
     printf("tokens(%zu):", n_ids);
     for (size_t i = 0; i < n_ids; i++) printf(" %d", ids[i]);
     printf("\n");
@@ -50,7 +50,14 @@ int main(int argc, char** argv) {
     printf("\n");
     float sum2 = 0;
     for (int d = 0; d < m.cfg.hidden_dim; d++) sum2 += vec[d]*vec[d];
-    printf("L2 长度 = %.8f (应≈1.0)\n", sqrtf(sum2));
+    float l2 = sqrtf(sum2);
+    printf("L2 长度 = %.8f (应≈1.0)\n", l2);
+    // 硬断言:L2 归一化必须成立(否则说明池化/归一化逻辑坏了)
+    if (fabsf(l2 - 1.0f) > 1e-3f) {
+        fprintf(stderr, "[FAIL] L2 长度偏离 1: %.8f\n", l2);
+        free(vec); wp_free(&wp); bert_free(&m);
+        return 1;
+    }
 
     // 若提供了基准向量文件,逐分量对拍
     if (argc > 2) {

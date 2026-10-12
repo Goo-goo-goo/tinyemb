@@ -227,19 +227,50 @@ int wp_tokenize(const WordPiece* wp,
     return 0;
 }
 
+// 查 id,查不到返回 fallback(HF 语义:未知 token → [UNK],绝不返回 -1 当 id 用)
+static int token_id_or(const WordPiece* wp, const char* token, int fallback) {
+    int id = wp_token_to_id(wp, token);
+    return id >= 0 ? id : fallback;
+}
+
 int wp_encode(const WordPiece* wp,
               const char* text,
-              int* ids, size_t* n_ids, size_t max_out) {
-    char** toks = malloc(max_out * sizeof(char*));
+              int* ids, size_t* n_ids, size_t max_out,
+              int truncate) {
+    if (!wp || !text || !ids || !n_ids) return -1;
+    // [CLS] + [SEP] 至少占 2 位
+    if (max_out < 2) return -1;
+
+    // 分词缓冲给足:正文上限 max_out-2,多分也放不下
+    size_t cap_body = max_out - 2;
+    size_t cap      = cap_body + 2;
+    char** toks = malloc(cap * sizeof(char*));
+    if (!toks) return -1;
+
     size_t n = 0;
-    wp_tokenize(wp, text, toks, &n, max_out);
+    wp_tokenize(wp, text, toks, &n, cap);
+
+    // 正文 token 数:截断到 cap_body,否则放不下就报错
+    size_t n_body = n;
+    if (n_body > cap_body) {
+        if (!truncate) {
+            wp_free_tokens(toks, n);
+            free(toks);
+            return -1;
+        }
+        n_body = cap_body;
+    }
+
+    int unk = token_id_or(wp, "[UNK]", 100);
+    int cls = token_id_or(wp, "[CLS]", 101);
+    int sep = token_id_or(wp, "[SEP]", 102);
 
     size_t m = 0;
-    if (m < max_out) ids[m++] = wp_token_to_id(wp, "[CLS]");   // 101
-    for (size_t i = 0; i < n && m < max_out; i++) {
-        ids[m++] = wp_token_to_id(wp, toks[i]);
+    ids[m++] = cls;
+    for (size_t i = 0; i < n_body; i++) {
+        ids[m++] = token_id_or(wp, toks[i], unk);
     }
-    if (m < max_out) ids[m++] = wp_token_to_id(wp, "[SEP]");   // 102
+    ids[m++] = sep;                                    // 恒在,截断也不会丢
 
     wp_free_tokens(toks, n);
     free(toks);

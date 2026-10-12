@@ -43,52 +43,83 @@ int tinyemb_dim(TinyEmb* h) {
     return h ? h->model.cfg.hidden_dim : 0;
 }
 
+int tinyemb_max_seq(TinyEmb* h) {
+    return h ? h->model.cfg.max_seq : 0;
+}
+
 int tinyemb_set_threads(TinyEmb* h, int n_threads) {
     if (!h) return 0;
     h->model.cfg.n_threads = n_threads;
     return n_threads;
 }
 
-// 内部:文本 → id 序列(带 [CLS]/[SEP]),返回 token 数,-1 失败
-static int tokenize_to(TinyEmb* h, const char* text, int* ids, int max_ids, size_t* n_out) {
+// 内部:文本 → id 序列(带 [CLS]/[SEP]),返回 token 数,-1 失败。
+// truncate=1 超长自动截断(保证 n <= max_ids),=0 超长报 -1。
+static int tokenize_to(TinyEmb* h, const char* text, int* ids, int max_ids,
+                       int truncate, size_t* n_out) {
     size_t n = 0;
-    if (wp_encode(&h->wp, text, ids, &n, (size_t)max_ids) != 0) return -1;
+    if (wp_encode(&h->wp, text, ids, &n, (size_t)max_ids, truncate) != 0) return -1;
     *n_out = n;
     return 0;
 }
 
-int tinyemb_encode_text(TinyEmb* h, const char* text, float* out, int out_cap) {
+// 单条文本编码,truncate 由调用方决定。超长按模型 max_seq 截断。
+int tinyemb_encode_text_ex(TinyEmb* h, const char* text, int truncate,
+                           float* out, int out_cap) {
     if (!h || !text || !out) return -1;
     int dim = h->model.cfg.hidden_dim;
     if (out_cap < dim) return -1;
 
-    int ids[1024];
-    size_t n = 0;
-    if (tokenize_to(h, text, ids, 1024, &n) != 0) return -1;
+    int max_seq = h->model.cfg.max_seq;
+    int* ids = malloc((size_t)max_seq * sizeof(int));
+    if (!ids) return -1;
 
-    return bert_encode(&h->model, ids, (int)n, out);
+    size_t n = 0;
+    if (tokenize_to(h, text, ids, max_seq, truncate, &n) != 0) {
+        free(ids);
+        return -1;
+    }
+    int rc = bert_encode(&h->model, ids, (int)n, out);
+    free(ids);
+    return rc;
+}
+
+int tinyemb_encode_text(TinyEmb* h, const char* text, float* out, int out_cap) {
+    // 默认 truncate=true(对齐 HF truncation=True)
+    return tinyemb_encode_text_ex(h, text, 1, out, out_cap);
 }
 
 int tinyemb_encode_ids(TinyEmb* h, const int* ids, int n_ids, float* out, int out_cap) {
     if (!h || !ids || !out) return -1;
     if (out_cap < h->model.cfg.hidden_dim) return -1;
+    // id 入口 = 调用方负责长度,超长直接报错(保留护栏,不静默截断)
     return bert_encode(&h->model, ids, n_ids, out);
 }
 
 int tinyemb_encode_texts(TinyEmb* h, const char** texts, int n_texts, float* out, int out_cap) {
+    // 默认 truncate=true
+    return tinyemb_encode_texts_ex(h, texts, n_texts, 1, out, out_cap);
+}
+
+int tinyemb_encode_texts_ex(TinyEmb* h, const char** texts, int n_texts, int truncate,
+                            float* out, int out_cap) {
     if (!h || !texts || !out || n_texts <= 0) return -1;
     int dim = h->model.cfg.hidden_dim;
     if (out_cap < dim * n_texts) return -1;
 
-    // 分词每句,拼接 id + 记录每句长度
-    int cap = 1024 * n_texts > 4096 ? 1024 * n_texts : 4096;
-    int* ids = malloc(cap * sizeof(int));
-    int* lens = malloc(n_texts * sizeof(int));
+    int max_seq = h->model.cfg.max_seq;
+
+    // 分词每句,拼接 id + 记录每句长度。每句上限 = max_seq(截断后恒不超)
+    int cap = max_seq * n_texts;
+    int* ids = malloc((size_t)cap * sizeof(int));
+    int* lens = malloc((size_t)n_texts * sizeof(int));
+    if (!ids || !lens) { free(ids); free(lens); return -1; }
+
     int total = 0;
     for (int s = 0; s < n_texts; s++) {
         size_t n = 0;
-        // 只取每个文本的分词,写到 ids+total
-        if (wp_encode(&h->wp, texts[s], ids + total, &n, (size_t)(cap - total)) != 0) {
+        // 每句最多占 max_seq 个位置,剩余空间足够(不会再被截)
+        if (tokenize_to(h, texts[s], ids + total, max_seq, truncate, &n) != 0) {
             free(ids); free(lens); return -1;
         }
         lens[s] = (int)n;
@@ -101,8 +132,16 @@ int tinyemb_encode_texts(TinyEmb* h, const char** texts, int n_texts, float* out
 
 int tinyemb_token_count(TinyEmb* h, const char* text) {
     if (!h || !text) return 0;
-    int ids[1024];
+    int max_seq = h->model.cfg.max_seq;
+    int* ids = malloc((size_t)max_seq * sizeof(int));
+    if (!ids) return 0;
+
     size_t n = 0;
-    if (tokenize_to(h, text, ids, 1024, &n) != 0) return 0;
+    // truncate=1:报告截断后的真实 token 数(=实际参与推理的长度)
+    if (tokenize_to(h, text, ids, max_seq, 1, &n) != 0) {
+        free(ids);
+        return 0;
+    }
+    free(ids);
     return (int)n;
 }

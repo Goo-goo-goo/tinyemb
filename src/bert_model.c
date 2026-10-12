@@ -172,10 +172,13 @@ int bert_encode_batch(const BertModel* m, const int* ids,
     if (n_seqs <= 0) return -1;
     int H = m->cfg.hidden_dim;
 
-    // 总 token 数 = 各句拼接(每句含 [CLS]/[SEP],由调用方保证)
+    // 总 token 数 = 各句拼接(每句含 [CLS]/[SEP],由调用方保证)。
+    // 注意:batch 内各句是独立序列(位置编码每句从 0 计数,注意力块对角隔离),
+    // 所以约束是"每句 <= max_seq",不是"总和 <= max_seq"。
+    // (位置编码用句内相对位置 t 取 pos_emb[t],只要单句不超 max_seq 即可。)
     int total = 0;
     for (int s = 0; s < n_seqs; s++) {
-        if (seq_lens[s] <= 0 || total + seq_lens[s] > m->cfg.max_seq) return -1;
+        if (seq_lens[s] <= 0 || seq_lens[s] > m->cfg.max_seq) return -1;
         total += seq_lens[s];
     }
 

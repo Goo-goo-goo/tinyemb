@@ -108,6 +108,12 @@ tinyemb_add_test(test_bert_model
   src/bert_model.c src/bert_layer.c src/tokenizer.c src/safetensor_loader.c src/ggml_backend_global.c)
 target_link_libraries(test_bert_model PRIVATE ggml::ggml)
 
+# ---- 截断(truncate)语义测试:走生产库 tinyemb 的导出 API ----
+tinyemb_add_test(test_truncate
+  test/test_truncate.c
+  src/tinyemb.c src/bert_model.c src/bert_layer.c src/tokenizer.c src/safetensor_loader.c src/ggml_backend_global.c)
+target_link_libraries(test_truncate PRIVATE ggml::ggml)
+
 # ---- 性能基准(无 ASan,Release 语义)----
 add_executable(bench
   test/bench.c
@@ -115,3 +121,5 @@ add_executable(bench
 target_include_directories(bench PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(bench PRIVATE ggml::ggml)
 set_target_properties(bench PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+
+
